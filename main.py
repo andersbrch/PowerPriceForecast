@@ -21,13 +21,6 @@ warnings.simplefilter("ignore")
 # Data Loading and Preprocessing
 # ---------------------------
 
-# Adding option to refresh the data from the Energinet API
-if st.sidebar.button("Refresh Data"):
-    # Clear the cached data so that the API is re-queried on the next run.
-    load_raw_data.clear()
-    preprocess_data.clear()
-    st.experimental_rerun()  # Force a rerun of the app
-
 @st.cache_data(ttl=3600)  # Refresh cache every hour
 def load_raw_data(limit=16800):
     """
@@ -56,6 +49,12 @@ def preprocess_data(raw_df: pd.DataFrame) -> pd.DataFrame:
     df['cos_weekly'] = np.cos(2 * np.pi * df['hour'] / 168)
     return df
 
+# Adding option to refresh the data from the Energinet API
+if st.sidebar.button("Refresh Data"):
+    # Clear the cached data so that the API is re-queried on the next run.
+    load_raw_data.clear()
+    preprocess_data.clear()
+    st.experimental_rerun()  # Force a rerun of the app
 
 @st.cache_data
 def filter_area_data(df: pd.DataFrame, area: str) -> pd.DataFrame:
