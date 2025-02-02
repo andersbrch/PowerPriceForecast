@@ -1,0 +1,1 @@
+Small dashboard that plots day-ahead spotprice from Energinet for different power price areas. The app also calculates a forecast from a seasonal ARIMA (hourly and weekly seasonality), a GARCH(1,1) and Gaussian VaR.
