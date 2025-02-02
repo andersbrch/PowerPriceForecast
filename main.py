@@ -219,6 +219,13 @@ exclude_cols = ['hour', 'sin_daily', 'cos_daily', 'sin_weekly', 'cos_weekly']
 price_areas = [col for col in df.columns if col not in exclude_cols]
 selected_area = st.sidebar.selectbox("Select Power Price Area", price_areas)
 
+# Adding option to refresh the data from the Energinet API
+if st.sidebar.button("Refresh Data"):
+    # Clear the cached data so that the API is re-queried on the next run.
+    load_raw_data.clear()
+    preprocess_data.clear()
+    st.experimental_rerun()  # Force a rerun of the app
+
 # Filter data for the selected area
 area_df = filter_area_data(df, selected_area)
 
