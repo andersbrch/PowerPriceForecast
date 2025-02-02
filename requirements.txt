@@ -6,4 +6,3 @@ statsmodels
 matplotlib
 arch
 scipy
-warnings
