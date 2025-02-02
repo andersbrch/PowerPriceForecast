@@ -1,8 +1,9 @@
-requests
+streamlit
 pandas
 numpy
-matplotlib
+requests
 statsmodels
-streamlit
+matplotlib
 arch
 scipy
+warnings
