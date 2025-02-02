@@ -21,7 +21,7 @@ warnings.simplefilter("ignore")
 # Data Loading and Preprocessing
 # ---------------------------
 
-@st.cache_data
+@st.cache_data(ttl=3600)  # Refresh cache every hour
 def load_raw_data(limit=16800):
     """
     Load raw data from the Energidataservice API.
