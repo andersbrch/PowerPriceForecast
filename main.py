@@ -80,7 +80,7 @@ def compute_expanding_forecast(y: pd.Series, X: pd.DataFrame, p: int = 1, d: int
         if pd.notna(test_y.iloc[i]):
             exog_future = test_X.iloc[[i]]
             try:
-                model = sm.tsa.SARIMAX(current_train_y, order=(1, 0, 1), exog=current_train_X)
+                model = sm.tsa.SARIMAX(current_train_y, order=(p, d, q), exog=current_train_X)
                 model_fit = model.fit(disp=False)
                 forecast = model_fit.forecast(steps=1, exog=exog_future)
             except Exception as e:
