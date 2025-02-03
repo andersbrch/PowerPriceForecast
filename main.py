@@ -242,7 +242,7 @@ order_d = st.sidebar.number_input("SARIMAX Order d", min_value=0, max_value=2, v
 order_q = st.sidebar.number_input("SARIMAX Order q", min_value=0, max_value=5, value=1, step=1)
 
 # Adding option to change VaR forecast
-confidence = st.sidebar.slider("Select confidence value for VaR", min_value=0.01, max_value=1, value=0.99, step=0.01)
+confidence = st.sidebar.slider("Select confidence value for VaR", min_value=0.01, max_value=1.0, value=0.99, step=0.01)
 alpha = 1 - confidence
 
 # Compute the expanding window forecast
