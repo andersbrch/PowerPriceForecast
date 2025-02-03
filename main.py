@@ -21,7 +21,6 @@ st.set_page_config(layout="wide", page_title="Electricity Price Forecasting Dash
 # ---------------------------
 # Caching Functions
 # ---------------------------
-# Button to refresh dashboard data
 if st.sidebar.button("Refresh Dashboard Data"):
     st.cache_data.clear()
 
@@ -152,8 +151,13 @@ def plot_forecast(df: pd.DataFrame, forecast_df: pd.DataFrame, train_split: int,
             name='Forecast',
             line=dict(color="red", dash="dash")
         ))
-    forecast_start = df.index[train_split]
-    fig.add_vline(x=forecast_start, line=dict(color="black", dash="dot"), annotation_text="Forecast Start")
+    # Convert forecast_start to a native Python datetime to avoid issues
+    forecast_start = df.index[train_split].to_pydatetime()
+    fig.add_vline(
+        x=forecast_start,
+        line=dict(color="black", dash="dot"),
+        annotation_text="Forecast Start"
+    )
     fig.update_layout(
         title="Expanding Window Forecasting",
         xaxis_title="Date",
@@ -320,7 +324,9 @@ y = area_df[selected_area]
 train_split = len(area_df) - forecast_horizon
 
 with st.spinner("Computing forecast..."):
-    forecast_results = compute_expanding_forecast(y, X, test_size=forecast_horizon, order=(order_p, order_d, order_q))
+    forecast_results = compute_expanding_forecast(
+        y, X, test_size=forecast_horizon, order=(order_p, order_d, order_q)
+    )
 
 # Plot forecast results
 plot_forecast(area_df, forecast_results, train_split, selected_area)
