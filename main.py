@@ -248,6 +248,14 @@ with st.spinner("Computing forecast..."):
 st.subheader(f"Seasonal ARIMA({order_p},{order_d},{order_q}) One-Step Ahead Forecast")
 plot_forecast(area_df, forecast_results, train_split, selected_area)
 
+# Display Forecast Error Metrics (MAE and MSE)
+if not forecast_results.empty:
+    mae = np.mean(np.abs(forecast_results['Actual'] - forecast_results['Forecast']))
+    mse = np.mean((forecast_results['Actual'] - forecast_results['Forecast'])**2)
+    st.write("### Forecast Error Metrics")
+    st.write(f"**Mean Absolute Error (MAE):** {mae:.2f}")
+    st.write(f"**Mean Squared Error (MSE):** {mse:.2f}")
+
 # GARCH volatility plot
 st.subheader("GARCH(1,1) Volatility")
 garch_volatility, df_ret = plot_garch_volatility(area_df, selected_area)
