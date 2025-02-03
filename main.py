@@ -10,7 +10,6 @@ import warnings
 
 # Set matplotlib backend for non-interactive plotting
 import matplotlib
-
 matplotlib.use("Agg")
 
 # Suppress warnings for a cleaner output
@@ -20,11 +19,10 @@ warnings.simplefilter("ignore")
 # Data Loading and Preprocessing
 # ---------------------------
 
-# Add a button to manually clear cached data and force refresh
 if st.sidebar.button("Refresh Dashboard Data"):
     st.cache_data.clear()
 
-@st.cache_data(ttl=3600)  # Refresh cache every hour
+@st.cache_data(ttl=3600)
 def load_raw_data(limit=16800):
     """
     Load raw data from the Energidataservice API.
@@ -35,8 +33,7 @@ def load_raw_data(limit=16800):
     data = response.json()
     return pd.DataFrame(data.get("records", []))
 
-
-@st.cache_data(ttl=3600)  # Refresh cache every hour
+@st.cache_data(ttl=3600)
 def preprocess_data(raw_df: pd.DataFrame) -> pd.DataFrame:
     """
     Preprocess the raw data: pivot and add seasonal features.
@@ -52,60 +49,43 @@ def preprocess_data(raw_df: pd.DataFrame) -> pd.DataFrame:
     df['cos_weekly'] = np.cos(2 * np.pi * df['hour'] / 168)
     return df
 
-@st.cache_data(ttl=3600)  # Refresh cache every hour
+@st.cache_data(ttl=3600)
 def filter_area_data(df: pd.DataFrame, area: str) -> pd.DataFrame:
     """
     Filter data for the selected price area by dropping rows with missing values.
     """
     return df.dropna(subset=[area])
 
-
 # ---------------------------
 # Forecasting Functions
 # ---------------------------
 @st.cache_data(show_spinner=True, ttl=3600)
-def compute_expanding_forecast(y: pd.Series, X: pd.DataFrame, p: int = 1, d: int = 0, q: int = 1, test_size: int = 24) -> pd.DataFrame:
+def compute_full_day_forecast(y: pd.Series, X: pd.DataFrame, p: int = 1, d: int = 0, q: int = 1, forecast_horizon: int = 24) -> pd.DataFrame:
     """
-    Perform an expanding window forecast using SARIMAX.
-    Returns a DataFrame with actual values and forecasts.
+    Fit a SARIMAX model on the training data (all but the last forecast_horizon observations)
+    and forecast the next forecast_horizon time steps (i.e. the full day ahead) in one go.
     """
-    train_size = len(y) - test_size
+    train_size = len(y) - forecast_horizon
     train_y, train_X = y.iloc[:train_size], X.iloc[:train_size]
     test_y, test_X = y.iloc[train_size:], X.iloc[train_size:]
-
-    forecasts, actuals, timestamps = [], [], []
-    current_train_y, current_train_X = train_y.copy(), train_X.copy()
-
-    for i in range(len(test_y)):
-        if pd.notna(test_y.iloc[i]):
-            exog_future = test_X.iloc[[i]]
-            try:
-                model = sm.tsa.SARIMAX(current_train_y, order=(p, d, q), exog=current_train_X)
-                model_fit = model.fit(disp=False)
-                forecast = model_fit.forecast(steps=1, exog=exog_future)
-            except Exception as e:
-                st.error(f"Forecasting error at index {i}: {e}")
-                continue
-            forecasts.append(forecast.iloc[0])
-            actuals.append(test_y.iloc[i])
-            timestamps.append(test_y.index[i])
-            # Expand the training set with the new observation
-            current_train_y = pd.concat([current_train_y, pd.Series(test_y.iloc[i], index=[test_y.index[i]])])
-            current_train_X = pd.concat([current_train_X, exog_future])
-
+    
+    # Fit the SARIMAX model
+    model = sm.tsa.SARIMAX(train_y, order=(p, d, q), exog=train_X)
+    model_fit = model.fit(disp=False)
+    
+    # Forecast the next 'forecast_horizon' periods using the exogenous variables for that period
+    forecast = model_fit.forecast(steps=forecast_horizon, exog=test_X)
+    
     results = pd.DataFrame({
-        'HourUTC': timestamps,
-        'Actual': actuals,
-        'Forecast': forecasts
+        'HourUTC': test_y.index,
+        'Actual': test_y.values,
+        'Forecast': forecast.values
     }).set_index('HourUTC')
-
     return results
-
 
 # ---------------------------
 # Plotting Functions
 # ---------------------------
-
 def plot_actual_prices(area_df: pd.DataFrame, area: str):
     """
     Plot the last 7 days of actual price data.
@@ -119,31 +99,26 @@ def plot_actual_prices(area_df: pd.DataFrame, area: str):
     ax.legend()
     st.pyplot(fig)
 
-
 def plot_forecast(df: pd.DataFrame, forecast_df: pd.DataFrame, train_split: int, area: str):
     """
-    Plot the forecasted prices alongside actual data.
+    Plot the full day forecast alongside actual data.
     """
     fig, ax = plt.subplots(figsize=(12, 6))
-
-    # Plot actual prices for the last 7 days
     last_7days = df.index[-7 * 24:]
     ax.plot(last_7days, df[area].loc[last_7days], label='Actual', color='blue')
 
-    # Plot forecasted values if available
     if not forecast_df.empty:
         ax.plot(forecast_df.index, forecast_df['Forecast'], label='Forecast', color='red', linestyle="--")
 
-    # Mark the forecast start point
+    # Mark the point where the forecast starts (i.e. the beginning of the full day forecast)
     forecast_start = df.index[train_split]
     ax.axvline(forecast_start, color="black", linestyle="dashed", label="Forecast Start")
 
     ax.set_xlabel("Date")
     ax.set_ylabel("Price (EUR)")
-    ax.set_title("Expanding Window Forecasting")
+    ax.set_title("Full Day Ahead Forecasting")
     ax.legend()
     st.pyplot(fig)
-
 
 def plot_garch_volatility(area_df: pd.DataFrame, area: str):
     """
@@ -174,7 +149,6 @@ def plot_garch_volatility(area_df: pd.DataFrame, area: str):
 
     return garch_volatility, df_ret
 
-
 def plot_var_forecast(df_ret: pd.Series, garch_volatility: pd.Series):
     """
     Plot the one-step ahead Value-at-Risk (VaR) forecast.
@@ -194,16 +168,13 @@ def plot_var_forecast(df_ret: pd.Series, garch_volatility: pd.Series):
     ax.legend()
     st.pyplot(fig)
 
-
 # ---------------------------
 # Streamlit App Layout
 # ---------------------------
-
 st.title("Electricity Price Forecasting Dashboard")
 st.subheader("Anders Brodersen Christiansen")
 st.write("Power spot price from [Energidataservice](https://www.energidataservice.dk/tso-electricity/Elspotprices)")
 
-# Sidebar for configuration
 st.sidebar.header("Settings")
 
 # Load and preprocess data
@@ -232,20 +203,20 @@ features = ['sin_daily', 'cos_daily', 'sin_weekly', 'cos_weekly']
 X = sm.add_constant(area_df[features])
 y = area_df[selected_area]
 
-# Determine train-test split for forecasting
-test_size = 24
-train_split = len(area_df) - test_size
+# Use the last 24 observations (one day) as the forecast horizon
+forecast_horizon = 24
+train_split = len(area_df) - forecast_horizon
 
-# Adding option to change model
+# Allow adjusting the SARIMAX order via the sidebar
 order_p = st.sidebar.number_input("SARIMAX Order p", min_value=0, max_value=5, value=1, step=1)
 order_d = st.sidebar.number_input("SARIMAX Order d", min_value=0, max_value=2, value=0, step=1)
 order_q = st.sidebar.number_input("SARIMAX Order q", min_value=0, max_value=5, value=1, step=1)
 
-# Compute the expanding window forecast
-with st.spinner("Computing forecast..."):
-    forecast_results = compute_expanding_forecast(y, X, order_p, order_d, order_q, test_size=test_size)
+# Compute the full day forecast (forecasting 24 hours ahead in one go)
+with st.spinner("Computing full day forecast..."):
+    forecast_results = compute_full_day_forecast(y, X, order_p, order_d, order_q, forecast_horizon=forecast_horizon)
 
-st.subheader(f"Seasonal ARIMA({order_p},{order_d},{order_q}) One-Step Ahead Forecast")
+st.subheader(f"Seasonal ARIMA({order_p},{order_d},{order_q}) Full Day Ahead Forecast")
 plot_forecast(area_df, forecast_results, train_split, selected_area)
 
 # Display Forecast Error Metrics (MAE and MSE)
