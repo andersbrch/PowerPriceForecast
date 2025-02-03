@@ -20,7 +20,7 @@ warnings.simplefilter("ignore")
 # ---------------------------
 
 # Add a button to manually clear cached data and force refresh
-if st.button("Refresh Dashboard Data"):
+if st.sidebar.button("Refresh Dashboard Data"):
     st.cache_data.clear()
 
 # ---------------------------
