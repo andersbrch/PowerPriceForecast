@@ -10,18 +10,24 @@ import warnings
 
 # Set matplotlib backend for non-interactive plotting
 import matplotlib
-
 matplotlib.use("Agg")
 
 # Suppress warnings for a cleaner output
 warnings.simplefilter("ignore")
 
+# ---------------------------
+# Manual Cache Clearing
+# ---------------------------
+
+# Add a button to manually clear cached data and force refresh
+if st.button("Refresh Dashboard Data"):
+    st.cache_data.clear()
 
 # ---------------------------
 # Data Loading and Preprocessing
 # ---------------------------
 
-@st.cache_data(ttl=3600)  # Refresh cache every hour
+@st.cache_data(ttl=3600)  # Auto-refresh cache every hour
 def load_raw_data(limit=16800):
     """
     Load raw data from the Energidataservice API.
@@ -32,8 +38,7 @@ def load_raw_data(limit=16800):
     data = response.json()
     return pd.DataFrame(data.get("records", []))
 
-
-@st.cache_data
+@st.cache_data(ttl=3600)  # Ensure preprocessing updates with new data
 def preprocess_data(raw_df: pd.DataFrame) -> pd.DataFrame:
     """
     Preprocess the raw data: pivot and add seasonal features.
@@ -49,19 +54,18 @@ def preprocess_data(raw_df: pd.DataFrame) -> pd.DataFrame:
     df['cos_weekly'] = np.cos(2 * np.pi * df['hour'] / 168)
     return df
 
-@st.cache_data
+@st.cache_data(ttl=3600)
 def filter_area_data(df: pd.DataFrame, area: str) -> pd.DataFrame:
     """
     Filter data for the selected price area by dropping rows with missing values.
     """
     return df.dropna(subset=[area])
 
-
 # ---------------------------
 # Forecasting Functions
 # ---------------------------
 
-@st.cache_data(show_spinner=True)
+@st.cache_data(ttl=3600)
 def compute_expanding_forecast(y: pd.Series, X: pd.DataFrame, test_size: int = 24) -> pd.DataFrame:
     """
     Perform an expanding window forecast using SARIMAX.
@@ -99,15 +103,12 @@ def compute_expanding_forecast(y: pd.Series, X: pd.DataFrame, test_size: int = 2
 
     return results
 
-
 # ---------------------------
 # Plotting Functions
 # ---------------------------
 
 def plot_actual_prices(area_df: pd.DataFrame, area: str):
-    """
-    Plot the last 7 days of actual price data.
-    """
+    """Plot the last 7 days of actual price data."""
     fig, ax = plt.subplots(figsize=(12, 6))
     last_7days = area_df.index[-7 * 24:]
     ax.plot(last_7days, area_df[area].loc[last_7days], label='Actual Price', color='blue')
@@ -117,22 +118,15 @@ def plot_actual_prices(area_df: pd.DataFrame, area: str):
     ax.legend()
     st.pyplot(fig)
 
-
 def plot_forecast(df: pd.DataFrame, forecast_df: pd.DataFrame, train_split: int, area: str):
-    """
-    Plot the forecasted prices alongside actual data.
-    """
+    """Plot the forecasted prices alongside actual data."""
     fig, ax = plt.subplots(figsize=(12, 6))
-
-    # Plot actual prices for the last 7 days
     last_7days = df.index[-7 * 24:]
     ax.plot(last_7days, df[area].loc[last_7days], label='Actual', color='blue')
 
-    # Plot forecasted values if available
     if not forecast_df.empty:
         ax.plot(forecast_df.index, forecast_df['Forecast'], label='Forecast', color='red', linestyle="--")
 
-    # Mark the forecast start point
     forecast_start = df.index[train_split]
     ax.axvline(forecast_start, color="black", linestyle="dashed", label="Forecast Start")
 
@@ -141,57 +135,6 @@ def plot_forecast(df: pd.DataFrame, forecast_df: pd.DataFrame, train_split: int,
     ax.set_title("Expanding Window Forecasting")
     ax.legend()
     st.pyplot(fig)
-
-
-def plot_garch_volatility(area_df: pd.DataFrame, area: str):
-    """
-    Plot GARCH(1,1) volatility versus absolute returns.
-    """
-    df_ret = area_df[area].diff().dropna()
-    if df_ret.empty:
-        st.write("Not enough return data available for GARCH modeling.")
-        return None, None
-
-    try:
-        garch_model = arch_model(df_ret, vol='GARCH', p=1, q=1)
-        garch_fit = garch_model.fit(disp="off")
-        garch_volatility = garch_fit.conditional_volatility
-    except Exception as e:
-        st.error(f"GARCH model fitting failed: {e}")
-        return None, None
-
-    fig, ax = plt.subplots(figsize=(12, 6))
-    last_7days = df_ret.index[-7 * 24:]
-    ax.scatter(last_7days, np.abs(df_ret.loc[last_7days]), label="Absolute Returns", color="black", alpha=0.5)
-    ax.plot(last_7days, garch_volatility.loc[last_7days], label="GARCH(1,1) Volatility", color="blue", linestyle="--")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Volatility / Absolute Returns")
-    ax.set_title("GARCH(1,1) Volatility vs. Absolute Returns")
-    ax.legend()
-    st.pyplot(fig)
-
-    return garch_volatility, df_ret
-
-
-def plot_var_forecast(df_ret: pd.Series, garch_volatility: pd.Series):
-    """
-    Plot the one-step ahead Value-at-Risk (VaR) forecast.
-    """
-    alpha = 0.01
-    z_score = norm.ppf(alpha)
-    VaR_1step = z_score * garch_volatility
-
-    fig, ax = plt.subplots(figsize=(12, 6))
-    last_7days = df_ret.index[-7 * 24:]
-    ax.scatter(last_7days, df_ret.loc[last_7days], color="black", alpha=0.5, label="Returns", s=10)
-    ax.plot(last_7days, VaR_1step.loc[last_7days], color="red", linestyle="-", label="VaR (GARCH-N)")
-    ax.axhline(0, color="black", linestyle="--", linewidth=0.5)
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Returns / VaR")
-    ax.set_title("One-Step Ahead VaR Forecasts using GARCH Model")
-    ax.legend()
-    st.pyplot(fig)
-
 
 # ---------------------------
 # Streamlit App Layout
@@ -240,12 +183,3 @@ with st.spinner("Computing forecast..."):
 
 st.subheader("Seasonal ARMA(1,1) One-Step Ahead Forecast")
 plot_forecast(area_df, forecast_results, train_split, selected_area)
-
-# GARCH volatility plot
-st.subheader("GARCH(1,1) Volatility")
-garch_volatility, df_ret = plot_garch_volatility(area_df, selected_area)
-
-# VaR forecast plot (only if GARCH model ran successfully)
-if (garch_volatility is not None) and (df_ret is not None):
-    st.subheader("Value-at-Risk (VaR) Forecast")
-    plot_var_forecast(df_ret, garch_volatility)
