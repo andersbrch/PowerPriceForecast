@@ -175,11 +175,11 @@ def plot_garch_volatility(area_df: pd.DataFrame, area: str):
     return garch_volatility, df_ret
 
 
-def plot_var_forecast(df_ret: pd.Series, garch_volatility: pd.Series):
+def plot_var_forecast(alpha = 0.01, df_ret: pd.Series, garch_volatility: pd.Series):
     """
     Plot the one-step ahead Value-at-Risk (VaR) forecast.
     """
-    alpha = 0.01
+    
     z_score = norm.ppf(alpha)
     VaR_1step = z_score * garch_volatility
 
@@ -241,6 +241,10 @@ order_p = st.sidebar.number_input("SARIMAX Order p", min_value=0, max_value=5, v
 order_d = st.sidebar.number_input("SARIMAX Order d", min_value=0, max_value=2, value=0, step=1)
 order_q = st.sidebar.number_input("SARIMAX Order q", min_value=0, max_value=5, value=1, step=1)
 
+# Adding option to change VaR forecast
+confidence = st.sidebar.slider("Select confidence value for VaR", min_value=0.01, max_value=1, value=0.99, step=0.01)
+alpha = 1 - confidence
+
 # Compute the expanding window forecast
 with st.spinner("Computing forecast..."):
     forecast_results = compute_expanding_forecast(y, X, order_p, order_d, order_q, test_size=test_size)
@@ -263,4 +267,4 @@ garch_volatility, df_ret = plot_garch_volatility(area_df, selected_area)
 # VaR forecast plot (only if GARCH model ran successfully)
 if (garch_volatility is not None) and (df_ret is not None):
     st.subheader("Value-at-Risk (VaR) Forecast")
-    plot_var_forecast(df_ret, garch_volatility)
+    plot_var_forecast(alpha, df_ret, garch_volatility)
