@@ -175,7 +175,7 @@ def plot_garch_volatility(area_df: pd.DataFrame, area: str):
     return garch_volatility, df_ret
 
 
-def plot_var_forecast(alpha = 0.01, df_ret: pd.Series, garch_volatility: pd.Series):
+def plot_var_forecast(df_ret: pd.Series, garch_volatility: pd.Series, float: alpha = 0.01,):
     """
     Plot the one-step ahead Value-at-Risk (VaR) forecast.
     """
@@ -267,4 +267,4 @@ garch_volatility, df_ret = plot_garch_volatility(area_df, selected_area)
 # VaR forecast plot (only if GARCH model ran successfully)
 if (garch_volatility is not None) and (df_ret is not None):
     st.subheader("Value-at-Risk (VaR) Forecast")
-    plot_var_forecast(alpha, df_ret, garch_volatility)
+    plot_var_forecast(df_ret, garch_volatility, alpha)
