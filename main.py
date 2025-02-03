@@ -64,7 +64,7 @@ def filter_area_data(df: pd.DataFrame, area: str) -> pd.DataFrame:
 # Forecasting Functions
 # ---------------------------
 @st.cache_data(show_spinner=True, ttl=3600)
-def compute_expanding_forecast(y: pd.Series, X: pd.DataFrame, test_size: int = 24) -> pd.DataFrame:
+def compute_expanding_forecast(y: pd.Series, X: pd.DataFrame, p: int = 1, d: int = 0, q: int = 1, test_size: int = 24) -> pd.DataFrame:
     """
     Perform an expanding window forecast using SARIMAX.
     Returns a DataFrame with actual values and forecasts.
@@ -236,11 +236,16 @@ y = area_df[selected_area]
 test_size = 24
 train_split = len(area_df) - test_size
 
+# Adding option to change model
+order_p = st.sidebar.number_input("SARIMAX Order p", min_value=0, max_value=5, value=1, step=1)
+order_d = st.sidebar.number_input("SARIMAX Order d", min_value=0, max_value=2, value=0, step=1)
+order_q = st.sidebar.number_input("SARIMAX Order q", min_value=0, max_value=5, value=1, step=1)
+
 # Compute the expanding window forecast
 with st.spinner("Computing forecast..."):
-    forecast_results = compute_expanding_forecast(y, X, test_size=test_size)
+    forecast_results = compute_expanding_forecast(y, X, order_p, order_d, order_q, test_size=test_size)
 
-st.subheader("Seasonal ARMA(1,1) One-Step Ahead Forecast")
+st.subheader(f"Seasonal ARIMA({order_p},{order_d},{order_q}) One-Step Ahead Forecast")
 plot_forecast(area_df, forecast_results, train_split, selected_area)
 
 # GARCH volatility plot
